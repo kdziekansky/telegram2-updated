@@ -857,6 +857,71 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
         await handle_language_selection(update, context)
         return
     
+    # Dodaj obsługę potwierdzeń operacji
+    if query.data.startswith("confirm_op_"):
+        operation_id = query.data.replace("confirm_op_", "")
+        
+        # Sprawdź, czy operacja istnieje w kontekście
+        if ('pending_operations' in context.user_data and 
+            operation_id in context.user_data['pending_operations']):
+            
+            operation = context.user_data['pending_operations'][operation_id]
+            operation_type = operation.get('type', '')
+            
+            # Usuwamy wiadomość z ostrzeżeniem
+            await query.message.delete()
+            
+            # Obsługa różnych typów operacji
+            if operation_type == 'generate_image':
+                # Wykonaj generowanie obrazu
+                prompt = operation.get('prompt', '')
+                quality = operation.get('quality', 'standard')
+                
+                # Wywołaj funkcję generowania obrazu
+                message = await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text=get_text("generating_image", language)
+                )
+                
+                # Generuj obraz
+                image_url = await generate_image_dall_e(prompt)
+                
+                # Odejmij kredyty
+                deduct_user_credits(user_id, operation.get('cost', 10), "Generowanie obrazu")
+                
+                if image_url:
+                    # Usuń wiadomość o ładowaniu
+                    await message.delete()
+                    
+                    # Wyślij obraz
+                    await context.bot.send_photo(
+                        chat_id=query.message.chat_id,
+                        photo=image_url,
+                        caption=f"*{get_text('generated_image', language)}*\n{prompt}\n{get_text('cost', language)}: {operation.get('cost', 10)} {get_text('credits', language)}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                else:
+                    # Aktualizuj wiadomość o błędzie
+                    await message.edit_text(get_text("image_generation_error", language))
+            
+            elif operation_type == 'analyze_document':
+                # Podobna implementacja dla analizy dokumentu
+                # ...
+            
+            elif operation_type == 'translate_photo':
+                # Podobna implementacja dla tłumaczenia zdjęcia
+                # ...
+            
+            # Usuń operację z kontekstu
+            del context.user_data['pending_operations'][operation_id]
+            return
+    
+elif query.data == "cancel_operation":
+    # Usuwamy wiadomość z ostrzeżeniem
+    await query.message.delete()
+    await query.answer(get_text("operation_canceled", language, default="Operacja anulowana"))
+    return
+
     # Dodaj to w sekcji obsługi callbacków w funkcji handle_callback_query
     if query.data == "menu_home":
     # Wywołaj funkcję powrotu do głównego menu
