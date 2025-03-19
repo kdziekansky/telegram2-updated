@@ -59,10 +59,6 @@ async def check_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Pobierz status kredytów
     credits = get_user_credits(user_id)
     
-    # Importuj i użyj funkcji paska stanu kredytów
-    from handlers.menu_handler import get_credit_status_bar
-    credits_bar = get_credit_status_bar(credits)
-    
     # Pobranie aktualnego trybu czatu
     current_mode = get_text("no_mode", language)
     current_mode_cost = 1
@@ -85,12 +81,11 @@ async def check_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Pobierz status wiadomości
     message_status = get_message_status(user_id)
     
-    # Stwórz wiadomość o statusie, używając tłumaczeń i dodając pasek stanu kredytów
+    # Stwórz wiadomość o statusie, używając tłumaczeń
     message = f"""
 *{get_text("status_command", language, bot_name=BOT_NAME)}*
 
 {get_text("available_credits", language)}: *{credits}*
-{get_text("credits_bar", language, default="Stan kredytów")}: {credits_bar}
 {get_text("current_mode", language)}: *{current_mode}* ({get_text("cost", language)}: {current_mode_cost} {get_text("credits_per_message", language)})
 {get_text("current_model", language)}: *{model_name}*
 
@@ -113,11 +108,7 @@ async def check_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Dodaj przyciski menu dla łatwiejszej nawigacji
     keyboard = [
         [InlineKeyboardButton(get_text("buy_credits_btn", language), callback_data="menu_credits_buy")],
-        [InlineKeyboardButton(get_text("credit_stats", language, default="Statystyki"), callback_data="credit_advanced_analytics")],
-        [
-            InlineKeyboardButton(get_text("menu_chat_mode", language), callback_data="menu_section_chat_modes"),
-            InlineKeyboardButton("🏠", callback_data="menu_home")
-        ]
+        [InlineKeyboardButton(get_text("menu_chat_mode", language), callback_data="menu_section_chat_modes")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     

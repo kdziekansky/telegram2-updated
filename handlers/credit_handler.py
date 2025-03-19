@@ -70,18 +70,13 @@ async def credits_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     language = get_user_language(context, user_id)
     credits = get_user_credits(user_id)
     
-    # Dodaj pasek stanu kredytów
-    from handlers.menu_handler import get_credit_status_bar
-    credits_bar = get_credit_status_bar(credits)
-    
     # Create buttons to buy credits
     keyboard = [[InlineKeyboardButton("🛒 Buy credits", callback_data="buy_credits")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Send credit information with visual status bar
+    # Send credit information
     await update.message.reply_text(
-        get_text("credits_info", language, bot_name=BOT_NAME, credits=credits) + 
-        f"\n\n{get_text('credits_bar', language, default='Stan kredytów')}: {credits_bar}",
+        get_text("credits_info", language, bot_name=BOT_NAME, credits=credits),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=reply_markup
     )
@@ -93,13 +88,6 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     language = get_user_language(context, user_id)
-    
-    # Pobierz stan kredytów
-    credits = get_user_credits(user_id)
-    
-    # Dodaj pasek stanu kredytów
-    from handlers.menu_handler import get_credit_status_bar
-    credits_bar = get_credit_status_bar(credits)
     
     # Check if package number is specified
     if context.args and len(context.args) > 0:
@@ -131,9 +119,7 @@ async def buy_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await update.message.reply_text(
-        get_text("buy_credits", language, packages=packages_text) + 
-        f"\n\n{get_text('current_balance', language)}: *{credits}* {get_text('credits', language)}\n" +
-        f"{get_text('credits_bar', language, default='Stan kredytów')}: {credits_bar}",
+        get_text("buy_credits", language, packages=packages_text),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=reply_markup
     )
@@ -189,31 +175,22 @@ async def handle_credit_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     # Obsługa sprawdzania stanu konta
     if query.data == "credits_check" or query.data == "menu_credits_check":
-# W funkcji handle_credit_callback gdzie obsługiwany jest "menu_credits_check"
-    if query.data == "credits_check" or query.data == "menu_credits_check":
         # Pobierz aktualne dane kredytów
         credits = get_user_credits(user_id)
         credit_stats = get_user_credit_stats(user_id)
         
-        # Generuj kolorowy pasek stanu kredytów
-        from handlers.menu_handler import get_credit_status_bar
-        credits_bar = get_credit_status_bar(credits)
-        
         # Przygotuj tekst wiadomości
         message = f"""
-    *{get_text('credits_management', language)}*
+*{get_text('credits_management', language)}*
 
-    {get_text('current_balance', language)}: *{credits}* {get_text('credits', language)}
-    {get_text('credits_bar', language, default='Stan kredytów')}: {credits_bar}
+{get_text('current_balance', language)}: *{credits}* {get_text('credits', language)}
 
-    {get_text('total_purchased', language)}: *{credit_stats.get('total_purchased', 0)}* {get_text('credits', language)}
-    {get_text('total_spent', language)}: *{credit_stats.get('total_spent', 0):.2f}* PLN
-    {get_text('last_purchase', language)}: *{credit_stats.get('last_purchase', get_text('no_transactions', language))}*
+{get_text('total_purchased', language)}: *{credit_stats.get('total_purchased', 0)}* {get_text('credits', language)}
+{get_text('total_spent', language)}: *{credit_stats.get('total_spent', 0):.2f}* PLN
+{get_text('last_purchase', language)}: *{credit_stats.get('last_purchase', get_text('no_transactions', language))}*
 
-    *{get_text('credit_history', language)} ({get_text('last_10', language, default='last 10')}):*
-    """
-    
-    # Reszta kodu pozostaje bez zmian...
+*{get_text('credit_history', language)} ({get_text('last_10', language, default='last 10')}):*
+"""
         
         if credit_stats.get('usage_history'):
             for i, transaction in enumerate(credit_stats['usage_history'], 1):
@@ -248,24 +225,11 @@ async def handle_credit_callback(update: Update, context: ContextTypes.DEFAULT_T
     
     # Obsługa zakupu kredytów
     if query.data == "credits_buy" or query.data == "menu_credits_buy":
-        user_id = query.from_user.id
-        language = get_user_language(context, user_id)
-        
         # Pobierz dostępne pakiety kredytów
         packages = get_credit_packages()
         
-        # Pobierz aktualny stan kredytów
-        credits = get_user_credits(user_id)
-        
-        # Generuj kolorowy pasek stanu kredytów
-        from handlers.menu_handler import get_credit_status_bar
-        credits_bar = get_credit_status_bar(credits)
-        
         # Przygotuj tekst wiadomości
-        message = f"🛒 *{get_text('buy_credits_btn', language)}*\n\n"
-        message += f"{get_text('current_balance', language)}: *{credits}* {get_text('credits', language)}\n"
-        message += f"{get_text('credits_bar', language, default='Stan kredytów')}: {credits_bar}\n\n"
-        message += f"{get_text('select_package', language)}:\n\n"
+        message = f"🛒 *{get_text('buy_credits_btn', language)}*\n\n{get_text('select_package', language)}:\n\n"
         
         # Utwórz klawiaturę z pakietami
         keyboard = []
@@ -412,19 +376,14 @@ async def credit_stats_command(update: Update, context: ContextTypes.DEFAULT_TYP
     language = get_user_language(context, user_id)
     stats = get_user_credit_stats(user_id)
     
-    # Dodaj pasek stanu kredytów
-    from handlers.menu_handler import get_credit_status_bar
-    credits_bar = get_credit_status_bar(stats['credits'])
-    
     # Format the date of last purchase
     last_purchase = "None" if not stats['last_purchase'] else stats['last_purchase'].split('T')[0]
     
-    # Create message with statistics and visual status bar
+    # Create message with statistics
     message = f"""
 *📊 Credit Statistics*
 
 Current balance: *{stats['credits']}* credits
-{get_text('credits_bar', language, default='Credits status')}: {credits_bar}
 Total purchased: *{stats['total_purchased']}* credits
 Total spent: *{stats['total_spent']}* PLN
 Last purchase: *{last_purchase}*
@@ -494,14 +453,9 @@ async def credit_analytics_command(update: Update, context: ContextTypes.DEFAULT
         )
         return
     
-    # Dodaj pasek stanu kredytów
-    from handlers.menu_handler import get_credit_status_bar
-    credits_bar = get_credit_status_bar(depletion_info['current_balance'])
-    
-    # Prepare analysis message with status bar
+    # Prepare analysis message
     message = f"📊 *Credit Usage Analysis*\n\n"
     message += f"Current balance: *{depletion_info['current_balance']}* credits\n"
-    message += f"{get_text('credits_bar', language, default='Credits status')}: {credits_bar}\n"
     message += f"Average daily usage: *{depletion_info['average_daily_usage']}* credits\n"
     
     if depletion_info['days_left']:
@@ -552,13 +506,6 @@ async def show_stars_purchase_options(update: Update, context: ContextTypes.DEFA
     user_id = update.effective_user.id
     language = get_user_language(context, user_id)
     
-    # Pobierz stan kredytów
-    credits = get_user_credits(user_id)
-    
-    # Dodaj pasek stanu kredytów
-    from handlers.menu_handler import get_credit_status_bar
-    credits_bar = get_credit_status_bar(credits)
-    
     # Get conversion rate
     conversion_rates = get_stars_conversion_rate()
     
@@ -581,8 +528,6 @@ async def show_stars_purchase_options(update: Update, context: ContextTypes.DEFA
     
     await update.message.reply_text(
         "🌟 *Purchase Credits with Telegram Stars* 🌟\n\n"
-        f"Current balance: *{credits}* credits\n"
-        f"{get_text('credits_bar', language, default='Credits status')}: {credits_bar}\n\n"
         "Choose one of the options below to exchange Telegram stars for credits.\n"
         "The more stars you exchange at once, the better bonus you'll receive!\n\n"
         "⚠️ *Note:* To purchase with stars, a Telegram Premium account is required.",

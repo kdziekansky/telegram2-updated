@@ -119,65 +119,23 @@ def get_menu_message_id(context, user_id):
 # ==================== FUNKCJE GENERUJĄCE UKŁADY MENU ====================
 
 def create_main_menu_markup(language):
-    """Tworzy klawiaturę dla głównego menu z kolorowymi paskami i ikonami"""
+    """Tworzy klawiaturę dla głównego menu"""
     keyboard = [
-        # Pierwszy rząd - najważniejsze funkcje (tryby czatu, generowanie obrazów)
         [
-            InlineKeyboardButton("🤖 " + get_text("menu_chat_mode", language), callback_data="menu_section_chat_modes"),
-            InlineKeyboardButton("🖼️ " + get_text("image_generate", language), callback_data="menu_image_generate")
+            InlineKeyboardButton(get_text("menu_chat_mode", language), callback_data="menu_section_chat_modes"),
+            InlineKeyboardButton(get_text("image_generate", language), callback_data="menu_image_generate")
         ],
-        # Drugi rząd - zarządzanie kredytami, historia rozmów
         [
-            InlineKeyboardButton("💰 " + get_text("menu_credits", language), callback_data="menu_section_credits"),
-            InlineKeyboardButton("📂 " + get_text("menu_dialog_history", language), callback_data="menu_section_history")
+            InlineKeyboardButton(get_text("menu_credits", language), callback_data="menu_section_credits"),
+            InlineKeyboardButton(get_text("menu_dialog_history", language), callback_data="menu_section_history")
         ],
-        # Trzeci rząd - ustawienia, pomoc
         [
-            InlineKeyboardButton("⚙️ " + get_text("menu_settings", language), callback_data="menu_section_settings"),
-            InlineKeyboardButton("❓ " + get_text("menu_help", language), callback_data="menu_help")
-        ],
-        # Stały pasek szybkiego dostępu
-        [
-            InlineKeyboardButton("🆕 " + get_text("new_chat", language, default="Nowa rozmowa"), callback_data="history_new")
+            InlineKeyboardButton(get_text("menu_settings", language), callback_data="menu_section_settings"),
+            InlineKeyboardButton(get_text("menu_help", language), callback_data="menu_help")
         ]
     ]
     
-    # Dodaj drugi przycisk do szybkiego dostępu, jeśli istnieje aktywna konwersacja
-    try:
-        # To trzeba owinąć w try-except, bo może nie być aktywnej konwersacji
-        keyboard[3].append(
-            InlineKeyboardButton("💬 " + get_text("last_conversation", language, default="Ostatnia rozmowa"), 
-                                callback_data="history_view")
-        )
-    except:
-        pass
-    
-    # Dodaj przycisk zakupu kredytów
-    keyboard.append([
-        InlineKeyboardButton("💸 " + get_text("buy_credits_btn", language), callback_data="menu_credits_buy")
-    ])
-    
     return InlineKeyboardMarkup(keyboard)
-
-def get_credit_status_bar(credits, max_width=10):
-    """Generuje pasek postępu dla kredytów"""
-    # Określ kolor na podstawie liczby kredytów
-    if credits > 50:
-        bar_color = "🟩"  # zielony
-    elif credits > 20:
-        bar_color = "🟨"  # żółty
-    else:
-        bar_color = "🟥"  # czerwony
-    
-    # Określ długość paska (maksymalnie 10 segmentów)
-    # Załóżmy, że 100 kredytów = pełny pasek
-    max_credits = 100
-    bar_length = min(max(1, int(credits / max_credits * max_width)), max_width)
-    
-    # Wygeneruj pasek postępu
-    bar = bar_color * bar_length + "⬜" * (max_width - bar_length)
-    
-    return f"{bar} ({credits})"
 
 def create_chat_modes_markup(language):
     """Tworzy klawiaturę dla menu trybów czatu"""
@@ -190,20 +148,16 @@ def create_chat_modes_markup(language):
         if mode_info['credit_cost'] != 1:
             credit_text = get_text("credits", language, default="kredytów")
         
-        # Dodaj ikony wskazujące na koszt trybu
-        mode_icon = "💰" if mode_info['credit_cost'] <= 1 else "⭐" if mode_info['credit_cost'] >= 5 else "🔶"
-        
         keyboard.append([
             InlineKeyboardButton(
-                f"{mode_icon} {mode_name} ({mode_info['credit_cost']} {credit_text})", 
+                f"{mode_name} ({mode_info['credit_cost']} {credit_text})", 
                 callback_data=f"mode_{mode_id}"
             )
         ])
     
-    # Dodaj przyciski nawigacyjne na dole
+    # Dodaj przycisk powrotu
     keyboard.append([
-        InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_back_main"),
-        InlineKeyboardButton("🏠", callback_data="menu_home")
+        InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main")
     ])
     
     return InlineKeyboardMarkup(keyboard)
@@ -211,46 +165,30 @@ def create_chat_modes_markup(language):
 def create_credits_menu_markup(language):
     """Tworzy klawiaturę dla menu kredytów"""
     keyboard = [
-        # Pozostawiamy istniejące przyciski
-        [InlineKeyboardButton("💳 " + get_text("check_balance", language), callback_data="menu_credits_check")],
-        [InlineKeyboardButton("🛒 " + get_text("buy_credits_btn", language), callback_data="menu_credits_buy")],
-        # Dodajemy pasek szybkiego dostępu
-        [InlineKeyboardButton("📊 " + get_text("credit_stats", language, default="Statystyki"), callback_data="credit_advanced_analytics")],
-        # Dodajemy przyciski nawigacyjne na dole
-        [
-            InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_back_main"),
-            InlineKeyboardButton("🏠", callback_data="menu_home")
-        ]
+        [InlineKeyboardButton(get_text("check_balance", language), callback_data="menu_credits_check")],
+        [InlineKeyboardButton(get_text("buy_credits_btn", language), callback_data="menu_credits_buy")],
+        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def create_settings_menu_markup(language):
     """Tworzy klawiaturę dla menu ustawień"""
     keyboard = [
-        [InlineKeyboardButton("🤖 " + get_text("settings_model", language), callback_data="settings_model")],
-        [InlineKeyboardButton("🌐 " + get_text("settings_language", language), callback_data="settings_language")],
-        [InlineKeyboardButton("👤 " + get_text("settings_name", language), callback_data="settings_name")],
-        [InlineKeyboardButton("💰 " + get_text("menu_credits", language), callback_data="menu_section_credits")],
-        # Dodajemy przyciski nawigacyjne na dole
-        [
-            InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_back_main"),
-            InlineKeyboardButton("🏠", callback_data="menu_home")
-        ]
+        [InlineKeyboardButton(get_text("settings_model", language), callback_data="settings_model")],
+        [InlineKeyboardButton(get_text("settings_language", language), callback_data="settings_language")],
+        [InlineKeyboardButton(get_text("settings_name", language), callback_data="settings_name")],
+        [InlineKeyboardButton(get_text("menu_credits", language), callback_data="menu_section_credits")],
+        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
 def create_history_menu_markup(language):
     """Tworzy klawiaturę dla menu historii"""
     keyboard = [
-        [InlineKeyboardButton("🆕 " + get_text("new_chat", language), callback_data="history_new")],
-        [InlineKeyboardButton("👁️ " + get_text("view_history", language), callback_data="history_view")],
-        [InlineKeyboardButton("🗑️ " + get_text("delete_history", language), callback_data="history_delete")],
-        [InlineKeyboardButton("📤 " + get_text("export_conversation", language, default="Eksportuj rozmowę"), callback_data="history_export")],
-        # Dodajemy przyciski nawigacyjne na dole
-        [
-            InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_back_main"),
-            InlineKeyboardButton("🏠", callback_data="menu_home")
-        ]
+        [InlineKeyboardButton(get_text("new_chat", language), callback_data="history_new")],
+        [InlineKeyboardButton(get_text("view_history", language), callback_data="history_view")],
+        [InlineKeyboardButton(get_text("delete_history", language), callback_data="history_delete")],
+        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -258,23 +196,18 @@ def create_model_selection_markup(language):
     """Tworzy klawiaturę dla wyboru modelu AI"""
     keyboard = []
     for model_id, model_name in AVAILABLE_MODELS.items():
-        # Dodaj ikonę zależną od kosztu modelu
+        # Dodaj informację o koszcie kredytów
         credit_cost = CREDIT_COSTS["message"].get(model_id, CREDIT_COSTS["message"]["default"])
-        
-        # Dodaj ikony wskazujące na typ modelu
-        model_icon = "💰" if credit_cost <= 1 else "⭐" if credit_cost >= 5 else "🔶"
-        
         keyboard.append([
             InlineKeyboardButton(
-                text=f"{model_icon} {model_name} ({credit_cost} {get_text('credits_per_message', language)})", 
+                text=f"{model_name} ({credit_cost} {get_text('credits_per_message', language)})", 
                 callback_data=f"model_{model_id}"
             )
         ])
     
-    # Dodaj przyciski nawigacyjne na dole
+    # Dodaj przycisk powrotu
     keyboard.append([
-        InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_section_settings"),
-        InlineKeyboardButton("🏠", callback_data="menu_home")
+        InlineKeyboardButton(get_text("back", language), callback_data="menu_section_settings")
     ])
     
     return InlineKeyboardMarkup(keyboard)
@@ -283,20 +216,16 @@ def create_language_selection_markup(language):
     """Tworzy klawiaturę dla wyboru języka"""
     keyboard = []
     for lang_code, lang_name in AVAILABLE_LANGUAGES.items():
-        # Dodaj zaznaczenie przy aktualnie wybranym języku
-        current = "✓ " if lang_code == language else ""
-        
         keyboard.append([
             InlineKeyboardButton(
-                current + lang_name, 
+                lang_name, 
                 callback_data=f"start_lang_{lang_code}"
             )
         ])
     
-    # Dodaj przyciski nawigacyjne na dole
+    # Dodaj przycisk powrotu
     keyboard.append([
-        InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_section_settings"),
-        InlineKeyboardButton("🏠", callback_data="menu_home")
+        InlineKeyboardButton(get_text("back", language), callback_data="menu_section_settings")
     ])
     
     return InlineKeyboardMarkup(keyboard)
@@ -317,59 +246,33 @@ async def update_message(query, caption_or_text, reply_markup, parse_mode=None):
         bool: True jeśli się powiodło, False w przypadku błędu
     """
     try:
-        # Dodaj kolorowe paski w zależności od sekcji menu
-        menu_section = None
-        if query.data.startswith("menu_section_"):
-            menu_section = query.data.replace("menu_section_", "")
-        
-        color_bar = ""
-        if menu_section == "chat_modes":
-            color_bar = "🟦 "  # Niebieski pasek dla trybów czatu
-        elif menu_section == "credits":
-            color_bar = "🟩 "  # Zielony pasek dla kredytów
-        elif menu_section == "history":
-            color_bar = "🟧 "  # Pomarańczowy pasek dla historii
-        elif menu_section == "settings":
-            color_bar = "⬜ "  # Szary pasek dla ustawień
-        elif query.data == "menu_help":
-            color_bar = "🟫 "  # Brązowy pasek dla pomocy
-        elif query.data == "menu_image_generate":
-            color_bar = "🟪 "  # Fioletowy pasek dla generowania obrazów
-        
-        # Dodaj pasek kolorowy na początku, jeśli to podmenu
-        if color_bar and not caption_or_text.startswith(color_bar):
-            caption_or_text = color_bar + caption_or_text
-        
-        # Reszta funkcji pozostaje bez zmian...
-     if hasattr(query.message, 'caption'):
-        await query.edit_message_caption(caption=caption_or_text, reply_markup=reply_markup)
-    else:
-        await query.edit_message_text(text=caption_or_text, reply_markup=reply_markup)
-    return True
-except Exception as e:
-    print(f"Błąd aktualizacji wiadomości: {e}")
-    
-    # Spróbuj bez formatowania, jeśli był ustawiony tryb formatowania
-    if parse_mode:
-        try:
-            return await update_message(query, caption_or_text, reply_markup, parse_mode=None)
-        except Exception as e2:
-            print(f"Drugi błąd aktualizacji wiadomości: {e2}")
-    
-    # Jeśli wszystko zawiedzie, spróbuj wysłać nową wiadomość
-    try:
-        error_keyboard = [[InlineKeyboardButton("🏠 Menu główne", callback_data="menu_back_main")]]
-        error_markup = InlineKeyboardMarkup(error_keyboard)
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text="⚠️ Wystąpił problem z wyświetleniem menu. Spróbuj ponownie.",
-            reply_markup=error_markup
-        )
-    except:
-        pass
-    
-    return False
-
+        if hasattr(query.message, 'caption'):
+            # Wiadomość ma podpis (jest to zdjęcie lub inny typ mediów)
+            if parse_mode:
+                await query.edit_message_caption(
+                    caption=caption_or_text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            else:
+                await query.edit_message_caption(
+                    caption=caption_or_text,
+                    reply_markup=reply_markup
+                )
+        else:
+            # Standardowa wiadomość tekstowa
+            if parse_mode:
+                await query.edit_message_text(
+                    text=caption_or_text,
+                    reply_markup=reply_markup,
+                    parse_mode=parse_mode
+                )
+            else:
+                await query.edit_message_text(
+                    text=caption_or_text,
+                    reply_markup=reply_markup
+                )
+        return True
     except Exception as e:
         print(f"Błąd aktualizacji wiadomości: {e}")
         
@@ -390,15 +293,10 @@ async def handle_chat_modes_section(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > 🤖 {get_text('menu_chat_mode', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('select_chat_mode', language)}"
     reply_markup = create_chat_modes_markup(language)
-    
     result = await update_message(
         query, 
-        message_text,
+        get_text("select_chat_mode", language),
         reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -411,11 +309,7 @@ async def handle_credits_section(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > 💰 {get_text('menu_credits', language)}"
-    
-    credits = get_user_credits(user_id)
-    message_text = f"{navigation_path}\n\n{get_text('credits_status', language, credits=credits)}\n\n{get_text('credit_options', language)}"
+    message_text = f"{get_text('credits_status', language, credits=get_user_credits(user_id))}\n\n{get_text('credit_options', language)}"
     reply_markup = create_credits_menu_markup(language)
     
     result = await update_message(
@@ -433,10 +327,7 @@ async def handle_history_section(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > 📂 {get_text('menu_dialog_history', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('history_options', language)}\n\n{get_text('export_info', language, default='Aby wyeksportować konwersację, użyj komendy /export')}"
+    message_text = get_text("history_options", language) + "\n\n" + get_text("export_info", language, default="Aby wyeksportować konwersację, użyj komendy /export")
     reply_markup = create_history_menu_markup(language)
     
     result = await update_message(
@@ -454,10 +345,7 @@ async def handle_settings_section(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > ⚙️ {get_text('menu_settings', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('settings_title', language, default='Ustawienia')}"
+    message_text = get_text("settings_options", language)
     reply_markup = create_settings_menu_markup(language)
     
     result = await update_message(
@@ -475,13 +363,9 @@ async def handle_help_section(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > ❓ {get_text('menu_help', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('help_text', language)}"
+    message_text = get_text("help_text", language)
     keyboard = [
-        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main"),
-         InlineKeyboardButton("🏠", callback_data="menu_home")]
+        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -500,13 +384,9 @@ async def handle_image_section(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > 🖼️ {get_text('image_generate', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('image_usage', language)}"
+    message_text = get_text("image_usage", language)
     keyboard = [
-        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main"),
-         InlineKeyboardButton("🏠", callback_data="menu_home")]
+        [InlineKeyboardButton(get_text("back", language), callback_data="menu_back_main")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -574,15 +454,10 @@ async def handle_model_selection(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > ⚙️ {get_text('menu_settings', language)} > 🤖 {get_text('settings_model', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('settings_choose_model', language)}"
     reply_markup = create_model_selection_markup(language)
-    
     result = await update_message(
         query,
-        message_text,
+        get_text("settings_choose_model", language),
         reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -595,15 +470,10 @@ async def handle_language_selection(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > ⚙️ {get_text('menu_settings', language)} > 🌐 {get_text('settings_language', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('settings_choose_language', language)}"
     reply_markup = create_language_selection_markup(language)
-    
     result = await update_message(
         query,
-        message_text,
+        get_text("settings_choose_language", language),
         reply_markup,
         parse_mode=ParseMode.MARKDOWN
     )
@@ -616,12 +486,8 @@ async def handle_name_settings(update, context):
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > ⚙️ {get_text('menu_settings', language)} > 👤 {get_text('settings_name', language)}"
-    
-    message_text = f"{navigation_path}\n\n{get_text('settings_change_name', language, default='Aby zmienić swoją nazwę, użyj komendy /setname [twoja_nazwa].')}"
-    keyboard = [[InlineKeyboardButton(get_text("back", language), callback_data="menu_section_settings"),
-                InlineKeyboardButton("🏠", callback_data="menu_home")]]
+    message_text = get_text("settings_change_name", language, default="Aby zmienić swoją nazwę, użyj komendy /setname [twoja_nazwa].\n\nNa przykład: /setname Jan Kowalski")
+    keyboard = [[InlineKeyboardButton(get_text("back", language), callback_data="menu_section_settings")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     result = await update_message(
@@ -632,34 +498,6 @@ async def handle_name_settings(update, context):
     )
     
     return result
-
-def create_settings_menu_markup(language, context=None, user_id=None):
-    """Tworzy klawiaturę dla menu ustawień"""
-    keyboard = [
-        [InlineKeyboardButton("🤖 " + get_text("settings_model", language), callback_data="settings_model")],
-        [InlineKeyboardButton("🌐 " + get_text("settings_language", language), callback_data="settings_language")],
-        [InlineKeyboardButton("👤 " + get_text("settings_name", language), callback_data="settings_name")],
-        [InlineKeyboardButton("💰 " + get_text("menu_credits", language), callback_data="menu_section_credits")],
-        
-        # Sprawdź, czy porady są włączone
-        ]
-    
-    # Dodaj przycisk do włączania/wyłączania porad jeśli context i user_id są dostępne
-    if context and user_id:
-        show_tips = True
-        if 'user_data' in context.chat_data and user_id in context.chat_data['user_data']:
-            show_tips = context.chat_data['user_data'][user_id].get('show_tips', True)
-            
-        tip_status = "✅" if show_tips else "❌"
-        keyboard.append([InlineKeyboardButton(f"💡 Porady: {tip_status}", callback_data="toggle_tips")])
-    
-    # Dodajemy przyciski nawigacyjne na dole
-    keyboard.append([
-        InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_back_main"),
-        InlineKeyboardButton("🏠", callback_data="menu_home")
-    ])
-    
-    return InlineKeyboardMarkup(keyboard)
 
 async def handle_history_view(update, context):
     """Obsługuje wyświetlanie historii"""
@@ -953,7 +791,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
     # Upewnij się, że klawiatura systemowa jest usunięta
-    await update.message.reply_text("Przygotowuję menu...", reply_markup=ReplyKeyboardRemove())
+    await update.message.reply_text("Usuwam klawiaturę...", reply_markup=ReplyKeyboardRemove())
     
     # Pobierz język użytkownika
     language = get_user_language(context, user_id)
@@ -964,25 +802,12 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Utwórz klawiaturę menu
     reply_markup = create_main_menu_markup(language)
     
-    # Dodaj obraz dla lepszego wyglądu
-    try:
-        banner_url = "https://i.imgur.com/OiPImmC.png"  # URL zdjęcia banera
-        
-        # Wyślij zdjęcie z podpisem menu
-        message = await update.message.reply_photo(
-            photo=banner_url,
-            caption=welcome_text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    except Exception as e:
-        print(f"Błąd przy wysyłaniu zdjęcia: {e}")
-        # Fallback do zwykłej wiadomości tekstowej
-        message = await update.message.reply_text(
-            welcome_text,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
+    # Wyślij menu
+    message = await update.message.reply_text(
+        welcome_text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
     
     # Zapisz ID wiadomości menu i stan menu
     store_menu_state(context, user_id, 'main', message.message_id)
@@ -1057,7 +882,6 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     elif query.data == "menu_back_main":
         return await handle_back_to_main(update, context)
     
-    
     # Obsługa kredytów bezpośrednio z menu
     elif query.data == "menu_credits_buy" or query.data == "credits_buy":
         user_id = query.from_user.id
@@ -1098,7 +922,6 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode=ParseMode.MARKDOWN
         )
         return True
-    
     
     elif query.data == "menu_credits_buy" or query.data == "credits_buy":
         user_id = query.from_user.id
@@ -1145,22 +968,6 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return True
     
-    # W funkcji handle_menu_callback dodaj tę obsługę
-    if query.data == "toggle_tips":
-    # Zmień ustawienie pokazywania porad
-    if 'user_data' not in context.chat_data:
-        context.chat_data['user_data'] = {}
-    
-    if user_id not in context.chat_data['user_data']:
-        context.chat_data['user_data'][user_id] = {}
-    
-    show_tips = not context.chat_data['user_data'][user_id].get('show_tips', True)
-    context.chat_data['user_data'][user_id]['show_tips'] = show_tips
-    
-    # Powrót do menu ustawień
-    await handle_settings_section(update, context)
-    return True
-
     # Ustawienia
     elif query.data == "settings_model":
         return await handle_model_selection(update, context)

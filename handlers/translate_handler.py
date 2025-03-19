@@ -60,35 +60,14 @@ async def translate_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def translate_photo(update: Update, context: ContextTypes.DEFAULT_TYPE, photo, target_lang="en"):
+    """Tłumaczy tekst wykryty na zdjęciu"""
     user_id = update.effective_user.id
     language = get_user_language(context, user_id)
     
     # Sprawdź, czy użytkownik ma wystarczającą liczbę kredytów
     credit_cost = 8  # Koszt tłumaczenia zdjęcia
-    current_credits = get_user_credits(user_id)
-    
-    # Dodaj ostrzeżenie dla operacji kosztujących > 5 kredytów
-    if credit_cost > 5:
-        from utils.warning_utils import create_credit_warning
-        warning_msg, reply_markup, operation_id = create_credit_warning(credit_cost, current_credits, language)
-        
-        # Zapisz dane operacji w kontekście użytkownika
-        if 'pending_operations' not in context.user_data:
-            context.user_data['pending_operations'] = {}
-        
-        context.user_data['pending_operations'][operation_id] = {
-            'type': 'translate_photo',
-            'photo_id': photo.file_id,
-            'target_lang': target_lang,
-            'cost': credit_cost
-        }
-        
-        # Wyślij ostrzeżenie
-        await update.message.reply_text(
-            warning_msg,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
+    if not check_user_credits(user_id, credit_cost):
+        await update.message.reply_text(get_text("subscription_expired", language))
         return
     
     # Wyślij informację o rozpoczęciu tłumaczenia
