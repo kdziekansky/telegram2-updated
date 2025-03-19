@@ -121,25 +121,63 @@ def get_menu_message_id(context, user_id):
 def create_main_menu_markup(language):
     """Tworzy klawiaturę dla głównego menu z kolorowymi paskami i ikonami"""
     keyboard = [
+        # Pierwszy rząd - najważniejsze funkcje (tryby czatu, generowanie obrazów)
         [
             InlineKeyboardButton("🤖 " + get_text("menu_chat_mode", language), callback_data="menu_section_chat_modes"),
             InlineKeyboardButton("🖼️ " + get_text("image_generate", language), callback_data="menu_image_generate")
         ],
+        # Drugi rząd - zarządzanie kredytami, historia rozmów
         [
             InlineKeyboardButton("💰 " + get_text("menu_credits", language), callback_data="menu_section_credits"),
             InlineKeyboardButton("📂 " + get_text("menu_dialog_history", language), callback_data="menu_section_history")
         ],
+        # Trzeci rząd - ustawienia, pomoc
         [
             InlineKeyboardButton("⚙️ " + get_text("menu_settings", language), callback_data="menu_section_settings"),
             InlineKeyboardButton("❓ " + get_text("menu_help", language), callback_data="menu_help")
         ],
-        # Dodajemy pasek szybkiego dostępu
+        # Stały pasek szybkiego dostępu
         [
             InlineKeyboardButton("🆕 " + get_text("new_chat", language, default="Nowa rozmowa"), callback_data="history_new")
         ]
     ]
     
+    # Dodaj drugi przycisk do szybkiego dostępu, jeśli istnieje aktywna konwersacja
+    try:
+        # To trzeba owinąć w try-except, bo może nie być aktywnej konwersacji
+        keyboard[3].append(
+            InlineKeyboardButton("💬 " + get_text("last_conversation", language, default="Ostatnia rozmowa"), 
+                                callback_data="history_view")
+        )
+    except:
+        pass
+    
+    # Dodaj przycisk zakupu kredytów
+    keyboard.append([
+        InlineKeyboardButton("💸 " + get_text("buy_credits_btn", language), callback_data="menu_credits_buy")
+    ])
+    
     return InlineKeyboardMarkup(keyboard)
+
+def get_credit_status_bar(credits, max_width=10):
+    """Generuje pasek postępu dla kredytów"""
+    # Określ kolor na podstawie liczby kredytów
+    if credits > 50:
+        bar_color = "🟩"  # zielony
+    elif credits > 20:
+        bar_color = "🟨"  # żółty
+    else:
+        bar_color = "🟥"  # czerwony
+    
+    # Określ długość paska (maksymalnie 10 segmentów)
+    # Załóżmy, że 100 kredytów = pełny pasek
+    max_credits = 100
+    bar_length = min(max(1, int(credits / max_credits * max_width)), max_width)
+    
+    # Wygeneruj pasek postępu
+    bar = bar_color * bar_length + "⬜" * (max_width - bar_length)
+    
+    return f"{bar} ({credits})"
 
 def create_chat_modes_markup(language):
     """Tworzy klawiaturę dla menu trybów czatu"""

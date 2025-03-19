@@ -972,25 +972,56 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             )
         return
     
-    # POPRAWKA: Bezpośrednia obsługa menu_credits_check
-    if query.data == "menu_credits_check" or query.data == "credits_check":
+# Poprawiona obsługa menu_credits_check
+if query.data == "menu_credits_check" or query.data == "credits_check":
     user_id = query.from_user.id
     language = get_user_language(context, user_id)
     
     # Dodanie paska nawigacyjnego
     navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > 💰 {get_text('menu_credits', language)} > 💳 {get_text('check_balance', language)}"
     
-    # Pobierz stan kredytów
+    # Pobierz aktualne dane kredytów
     credits = get_user_credits(user_id)
     credit_stats = get_user_credit_stats(user_id)
     
+    # Generuj kolorowy pasek stanu kredytów
+    from handlers.menu_handler import get_credit_status_bar
+    credits_bar = get_credit_status_bar(credits)
+    
     # Przygotuj tekst wiadomości z paskiem nawigacyjnym
-    message = f"{navigation_path}\n\n{get_text('credits_info', language, bot_name=BOT_NAME, credits=credits)}"
+    message = f"{navigation_path}\n\n"
+    message += f"*{get_text('credits_management', language, default='Zarządzanie kredytami')}*\n\n"
+    message += f"{get_text('current_balance', language)}: *{credits}* {get_text('credits', language)}\n"
+    message += f"Stan kredytów: {credits_bar}\n\n"
+    
+    if 'total_purchased' in credit_stats:
+        message += f"{get_text('total_purchased', language)}: *{credit_stats.get('total_purchased', 0)}* {get_text('credits', language)}\n"
+    
+    if 'total_spent' in credit_stats:
+        message += f"{get_text('total_spent', language)}: *{credit_stats.get('total_spent', 0):.2f}* PLN\n"
+    
+    if 'last_purchase' in credit_stats and credit_stats['last_purchase']:
+        formatted_date = credit_stats['last_purchase'].split('T')[0] if 'T' in credit_stats['last_purchase'] else credit_stats['last_purchase']
+        message += f"{get_text('last_purchase', language)}: *{formatted_date}*\n"
+    
+    message += f"\n*{get_text('credit_history', language)} ({get_text('last_10', language, default='ostatnie 10')}):*\n"
+    
+    if credit_stats.get('usage_history'):
+        for i, transaction in enumerate(credit_stats['usage_history'], 1):
+            date = transaction['date'].split('T')[0] if 'T' in transaction['date'] else transaction['date']
+            if transaction['type'] in ["add", "purchase"]:
+                message += f"\n{i}. ➕ +{transaction['amount']} {get_text('credits', language)} ({date})"
+            else:
+                message += f"\n{i}. ➖ -{transaction['amount']} {get_text('credits', language)} ({date})"
+            if transaction.get('description'):
+                message += f" - {transaction['description']}"
+    else:
+        message += f"\n{get_text('no_transactions', language)}"
     
     # Klawiatura z opcjami
     keyboard = [
-        [InlineKeyboardButton(get_text("buy_credits_btn", language), callback_data="credits_buy")],
-        [InlineKeyboardButton(get_text("credit_stats", language, default="Statystyki"), callback_data="credits_stats")],
+        [InlineKeyboardButton(get_text("buy_credits_btn", language), callback_data="menu_credits_buy")],
+        [InlineKeyboardButton(get_text("credit_stats", language, default="Statystyki"), callback_data="credit_advanced_analytics")],
         [InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_section_credits"),
          InlineKeyboardButton("🏠", callback_data="menu_home")]
     ]
@@ -998,23 +1029,7 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Aktualizuj wiadomość
-    if hasattr(query.message, 'caption'):
-        await query.edit_message_caption(
-            caption=message,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    else:
-        await query.edit_message_text(
-            text=message,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    return True
-        
-        # Tekst informacyjny o kredytach
-        message = get_text("credits_info", language, bot_name=BOT_NAME, credits=credits)
-        
+    try:
         if hasattr(query.message, 'caption'):
             await query.edit_message_caption(
                 caption=message,
@@ -1027,58 +1042,19 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.MARKDOWN
             )
-        return
-    
-    # POPRAWKA: Bezpośrednia obsługa menu_credits_buy
-# W handle_callback_query, w sekcji obsługującej menu_credits_buy
-    if query.data == "menu_credits_buy" or query.data == "credits_buy":
-    user_id = query.from_user.id
-    language = get_user_language(context, user_id)
-    
-    # Dodanie paska nawigacyjnego
-    navigation_path = f"🏠 {get_text('menu', language, default='Menu główne')} > 💰 {get_text('menu_credits', language)} > 🛒 {get_text('buy_credits_btn', language)}"
-    
-    # Pobierz pakiety kredytów
-    packages = get_credit_packages()
-    
-    packages_text = ""
-    for pkg in packages:
-        packages_text += f"*{pkg['id']}.* {pkg['name']} - *{pkg['credits']}* {get_text('credits', language)} - *{pkg['price']} PLN*\n"
-    
-    # Przygotuj tekst wiadomości z paskiem nawigacyjnym
-    message = f"{navigation_path}\n\n{get_text('buy_credits', language, packages=packages_text)}"
-    
-    # Utwórz klawiaturę z pakietami
-    keyboard = []
-    for pkg in packages:
-        keyboard.append([
-            InlineKeyboardButton(
-                f"{pkg['name']} - {pkg['credits']} {get_text('credits', language)} ({pkg['price']} PLN)", 
-                callback_data=f"buy_package_{pkg['id']}"
+    except Exception as e:
+        print(f"Błąd przy aktualizacji wiadomości: {e}")
+        # Próbuj wysłać bez formatowania Markdown
+        if hasattr(query.message, 'caption'):
+            await query.edit_message_caption(
+                caption=message,
+                reply_markup=reply_markup
             )
-        ])
-    
-    # Dodaj przyciski nawigacyjne
-    keyboard.append([
-        InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_section_credits"),
-        InlineKeyboardButton("🏠", callback_data="menu_home")
-    ])
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Aktualizuj wiadomość
-    if hasattr(query.message, 'caption'):
-        await query.edit_message_caption(
-            caption=message,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
-    else:
-        await query.edit_message_text(
-            text=message,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.MARKDOWN
-        )
+        else:
+            await query.edit_message_text(
+                text=message,
+                reply_markup=reply_markup
+            )
     return True
     
     # Obsługa przycisku tłumaczenia zdjęcia

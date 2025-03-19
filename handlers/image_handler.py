@@ -19,6 +19,9 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     quality = "standard"  # domyślna jakość
     credit_cost = CREDIT_COSTS["image"][quality]
     
+    # Pobierz aktualny stan kredytów
+    current_credits = get_user_credits(user_id)
+    
     if not check_user_credits(user_id, credit_cost):
         await update.message.reply_text(get_text("subscription_expired", language))
         return
@@ -30,6 +33,31 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     prompt = ' '.join(context.args)
     
+    # Dodaj ostrzeżenie dla operacji kosztujących > 5 kredytów
+    if credit_cost > 5:
+        from utils.warning_utils import create_credit_warning
+        warning_msg, reply_markup, operation_id = create_credit_warning(credit_cost, current_credits, language)
+        
+        # Zapisz dane operacji w kontekście użytkownika
+        if 'pending_operations' not in context.user_data:
+            context.user_data['pending_operations'] = {}
+        
+        context.user_data['pending_operations'][operation_id] = {
+            'type': 'generate_image',
+            'prompt': prompt,
+            'quality': quality,
+            'cost': credit_cost
+        }
+        
+        # Wyślij ostrzeżenie
+        await update.message.reply_text(
+            warning_msg,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+    
+    # Reszta oryginalnego kodu...
     # Powiadom użytkownika o rozpoczęciu generowania
     message = await update.message.reply_text(get_text("generating_image", language))
     
