@@ -303,6 +303,103 @@ async def handle_credit_callback(update: Update, context: ContextTypes.DEFAULT_T
             )
         return True
     
+    if query.data == "credits_stats" or query.data == "credit_advanced_analytics":
+        user_id = query.from_user.id
+        language = get_user_language(context, user_id)
+        
+        # Informuj użytkownika że analiza się rozpoczyna
+        if hasattr(query.message, 'caption'):
+            await query.edit_message_caption(
+                caption="⏳ Analizuję dane wykorzystania kredytów..."
+            )
+        else:
+            await query.edit_message_text(
+                text="⏳ Analizuję dane wykorzystania kredytów..."
+            )
+        
+        # Domyślna liczba dni do analizy
+        days = 30
+        
+        # Pobierz prognozę zużycia kredytów
+        depletion_info = predict_credit_depletion(user_id, days)
+        
+        if not depletion_info:
+            if hasattr(query.message, 'caption'):
+                await query.edit_message_caption(
+                    caption="Nie masz wystarczającej historii użycia kredytów do przeprowadzenia analizy. Spróbuj ponownie po wykonaniu kilku operacji."
+                )
+            else:
+                await query.edit_message_text(
+                    text="Nie masz wystarczającej historii użycia kredytów do przeprowadzenia analizy. Spróbuj ponownie po wykonaniu kilku operacji."
+                )
+            return True
+        
+        # Przygotuj wiadomość z analizą
+        message = f"📊 *Analiza wykorzystania kredytów*\n\n"
+        message += f"Aktualny stan: *{depletion_info['current_balance']}* kredytów\n"
+        message += f"Średnie dzienne zużycie: *{depletion_info['average_daily_usage']}* kredytów\n"
+        
+        if depletion_info['days_left']:
+            message += f"Przewidywane wyczerpanie kredytów: za *{depletion_info['days_left']}* dni "
+            message += f"({depletion_info['depletion_date']})\n\n"
+        else:
+            message += f"Za mało danych, aby przewidzieć wyczerpanie kredytów.\n\n"
+        
+        # Pobierz rozkład zużycia kredytów
+        usage_breakdown = get_credit_usage_breakdown(user_id, days)
+        
+        if usage_breakdown:
+            message += f"*Rozkład zużycia kredytów:*\n"
+            for category, amount in usage_breakdown.items():
+                percentage = amount / sum(usage_breakdown.values()) * 100
+                message += f"- {category}: *{amount}* kredytów ({percentage:.1f}%)\n"
+        
+        # Zaktualizuj wiadomość z analizą
+        if hasattr(query.message, 'caption'):
+            await query.edit_message_caption(
+                caption=message,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await query.edit_message_text(
+                text=message,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        # Generuj i wysyłaj wykresy
+        # Wykres historii użycia
+        usage_chart = generate_credit_usage_chart(user_id, days)
+        if usage_chart:
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=usage_chart,
+                caption=f"📈 Historia wykorzystania kredytów z ostatnich {days} dni"
+            )
+        
+        # Wykres rozkładu użycia
+        breakdown_chart = generate_usage_breakdown_chart(user_id, days)
+        if breakdown_chart:
+            await context.bot.send_photo(
+                chat_id=query.message.chat_id,
+                photo=breakdown_chart,
+                caption=f"📊 Rozkład wykorzystania kredytów z ostatnich {days} dni"
+            )
+        
+        # Dodaj przycisk powrotu
+        keyboard = [[InlineKeyboardButton("Powrót", callback_data="menu_credits_check")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Zaktualizuj wiadomość z przyciskiem powrotu
+        try:
+            if hasattr(query.message, 'caption'):
+                await query.edit_message_reply_markup(reply_markup=reply_markup)
+            else:
+                await query.message.edit_reply_markup(reply_markup=reply_markup)
+        except Exception as e:
+            print(f"Błąd przy aktualizacji klawiatury: {e}")
+        
+        return True
+
     # Obsługa opcji zakupu za gwiazdki
     if query.data == "show_stars_options":
         # Pobierz kursy wymiany gwiazdek
