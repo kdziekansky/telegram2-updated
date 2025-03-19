@@ -190,9 +190,12 @@ def create_chat_modes_markup(language):
         if mode_info['credit_cost'] != 1:
             credit_text = get_text("credits", language, default="kredytów")
         
+        # Dodaj ikony wskazujące na koszt trybu
+        mode_icon = "💰" if mode_info['credit_cost'] <= 1 else "⭐" if mode_info['credit_cost'] >= 5 else "🔶"
+        
         keyboard.append([
             InlineKeyboardButton(
-                f"{mode_name} ({mode_info['credit_cost']} {credit_text})", 
+                f"{mode_icon} {mode_name} ({mode_info['credit_cost']} {credit_text})", 
                 callback_data=f"mode_{mode_id}"
             )
         ])
@@ -338,33 +341,35 @@ async def update_message(query, caption_or_text, reply_markup, parse_mode=None):
             caption_or_text = color_bar + caption_or_text
         
         # Reszta funkcji pozostaje bez zmian...
-        if hasattr(query.message, 'caption'):
-            # Wiadomość ma podpis (jest to zdjęcie lub inny typ mediów)
-            if parse_mode:
-                await query.edit_message_caption(
-                    caption=caption_or_text,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode
-                )
-            else:
-                await query.edit_message_caption(
-                    caption=caption_or_text,
-                    reply_markup=reply_markup
-                )
-        else:
-            # Standardowa wiadomość tekstowa
-            if parse_mode:
-                await query.edit_message_text(
-                    text=caption_or_text,
-                    reply_markup=reply_markup,
-                    parse_mode=parse_mode
-                )
-            else:
-                await query.edit_message_text(
-                    text=caption_or_text,
-                    reply_markup=reply_markup
-                )
-        return True
+     if hasattr(query.message, 'caption'):
+        await query.edit_message_caption(caption=caption_or_text, reply_markup=reply_markup)
+    else:
+        await query.edit_message_text(text=caption_or_text, reply_markup=reply_markup)
+    return True
+except Exception as e:
+    print(f"Błąd aktualizacji wiadomości: {e}")
+    
+    # Spróbuj bez formatowania, jeśli był ustawiony tryb formatowania
+    if parse_mode:
+        try:
+            return await update_message(query, caption_or_text, reply_markup, parse_mode=None)
+        except Exception as e2:
+            print(f"Drugi błąd aktualizacji wiadomości: {e2}")
+    
+    # Jeśli wszystko zawiedzie, spróbuj wysłać nową wiadomość
+    try:
+        error_keyboard = [[InlineKeyboardButton("🏠 Menu główne", callback_data="menu_back_main")]]
+        error_markup = InlineKeyboardMarkup(error_keyboard)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="⚠️ Wystąpił problem z wyświetleniem menu. Spróbuj ponownie.",
+            reply_markup=error_markup
+        )
+    except:
+        pass
+    
+    return False
+
     except Exception as e:
         print(f"Błąd aktualizacji wiadomości: {e}")
         
@@ -627,6 +632,34 @@ async def handle_name_settings(update, context):
     )
     
     return result
+
+def create_settings_menu_markup(language, context=None, user_id=None):
+    """Tworzy klawiaturę dla menu ustawień"""
+    keyboard = [
+        [InlineKeyboardButton("🤖 " + get_text("settings_model", language), callback_data="settings_model")],
+        [InlineKeyboardButton("🌐 " + get_text("settings_language", language), callback_data="settings_language")],
+        [InlineKeyboardButton("👤 " + get_text("settings_name", language), callback_data="settings_name")],
+        [InlineKeyboardButton("💰 " + get_text("menu_credits", language), callback_data="menu_section_credits")],
+        
+        # Sprawdź, czy porady są włączone
+        ]
+    
+    # Dodaj przycisk do włączania/wyłączania porad jeśli context i user_id są dostępne
+    if context and user_id:
+        show_tips = True
+        if 'user_data' in context.chat_data and user_id in context.chat_data['user_data']:
+            show_tips = context.chat_data['user_data'][user_id].get('show_tips', True)
+            
+        tip_status = "✅" if show_tips else "❌"
+        keyboard.append([InlineKeyboardButton(f"💡 Porady: {tip_status}", callback_data="toggle_tips")])
+    
+    # Dodajemy przyciski nawigacyjne na dole
+    keyboard.append([
+        InlineKeyboardButton("⬅️ " + get_text("back", language), callback_data="menu_back_main"),
+        InlineKeyboardButton("🏠", callback_data="menu_home")
+    ])
+    
+    return InlineKeyboardMarkup(keyboard)
 
 async def handle_history_view(update, context):
     """Obsługuje wyświetlanie historii"""
@@ -1024,6 +1057,7 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     elif query.data == "menu_back_main":
         return await handle_back_to_main(update, context)
     
+    
     # Obsługa kredytów bezpośrednio z menu
     elif query.data == "menu_credits_buy" or query.data == "credits_buy":
         user_id = query.from_user.id
@@ -1064,6 +1098,7 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode=ParseMode.MARKDOWN
         )
         return True
+    
     
     elif query.data == "menu_credits_buy" or query.data == "credits_buy":
         user_id = query.from_user.id
@@ -1110,6 +1145,22 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return True
     
+    # W funkcji handle_menu_callback dodaj tę obsługę
+    if query.data == "toggle_tips":
+    # Zmień ustawienie pokazywania porad
+    if 'user_data' not in context.chat_data:
+        context.chat_data['user_data'] = {}
+    
+    if user_id not in context.chat_data['user_data']:
+        context.chat_data['user_data'][user_id] = {}
+    
+    show_tips = not context.chat_data['user_data'][user_id].get('show_tips', True)
+    context.chat_data['user_data'][user_id]['show_tips'] = show_tips
+    
+    # Powrót do menu ustawień
+    await handle_settings_section(update, context)
+    return True
+
     # Ustawienia
     elif query.data == "settings_model":
         return await handle_model_selection(update, context)

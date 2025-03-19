@@ -18,6 +18,19 @@ from config import (
     AVAILABLE_LANGUAGES, ADMIN_USER_IDS
 )
 
+TIPS = [
+    "Krótsze pytania zazwyczaj zużywają mniej kredytów niż długie opisy.",
+    "Używaj trybu GPT-3.5 dla prostych pytań, a GPT-4 tylko dla złożonych zadań.",
+    "Możesz zaoszczędzić kredyty używając /mode aby wybrać tańszy model.",
+    "Zdjęcia z wyraźnym tekstem dają lepsze wyniki przy tłumaczeniu.",
+    "Zaproś znajomych przez program referencyjny, aby otrzymać darmowe kredyty.",
+    "Używanie komend jest często szybsze niż nawigacja przez menu.",
+    "Eksportuj swoje konwersacje do PDF używając komendy /export.",
+    "Podziel konwersacje na tematy, aby łatwiej je organizować.",
+    "Wypróbuj różne tryby czatu, aby znaleźć najlepszy dla twojego zadania.",
+    "Możesz tłumaczyć tekst ze zdjęć używając komendy /translate."
+]
+
 # Import funkcji z modułu tłumaczeń
 from utils.translations import get_text
 
@@ -455,75 +468,58 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     language = get_user_language(context, user_id)
     
-    print(f"Otrzymano wiadomość od użytkownika {user_id}: {user_message}")
+    # Inicjalizacja danych użytkownika, jeśli nie istnieją
+    if 'user_data' not in context.chat_data:
+        context.chat_data['user_data'] = {}
     
-    # Określ tryb i koszt kredytów
-    current_mode = "no_mode"
-    credit_cost = 1
+    if user_id not in context.chat_data['user_data']:
+        context.chat_data['user_data'][user_id] = {}
     
-    if 'user_data' in context.chat_data and user_id in context.chat_data['user_data']:
-        user_data = context.chat_data['user_data'][user_id]
-        if 'current_mode' in user_data and user_data['current_mode'] in CHAT_MODES:
-            current_mode = user_data['current_mode']
-            credit_cost = CHAT_MODES[current_mode]["credit_cost"]
+    # Inicjalizacja licznika interakcji i ustawień porad, jeśli nie istnieją
+    if 'interaction_count' not in context.chat_data['user_data'][user_id]:
+        context.chat_data['user_data'][user_id]['interaction_count'] = 0
     
-    print(f"Tryb: {current_mode}, koszt kredytów: {credit_cost}")
+    if 'show_tips' not in context.chat_data['user_data'][user_id]:
+        context.chat_data['user_data'][user_id]['show_tips'] = True
     
-    # Sprawdź, czy użytkownik ma wystarczającą liczbę kredytów
-    has_credits = check_user_credits(user_id, credit_cost)
-    print(f"Czy użytkownik ma wystarczająco kredytów: {has_credits}")
+    # Zwiększ licznik interakcji
+    context.chat_data['user_data'][user_id]['interaction_count'] += 1
     
-    if not has_credits:
+    # Kontynuacja standardowej obsługi wiadomości
+    # Sprawdź, czy użytkownik ma dostępne wiadomości
+    if not check_message_limit(user_id):
         await update.message.reply_text(get_text("subscription_expired", language))
         return
     
     # Pobierz lub utwórz aktywną konwersację
-    try:
-        conversation = get_active_conversation(user_id)
-        conversation_id = conversation['id']
-        print(f"Aktywna konwersacja: {conversation_id}")
-    except Exception as e:
-        print(f"Błąd przy pobieraniu konwersacji: {e}")
-        await update.message.reply_text("Wystąpił błąd przy pobieraniu konwersacji. Spróbuj /newchat aby utworzyć nową.")
-        return
+    conversation = get_active_conversation(user_id)
+    conversation_id = conversation['id']
     
     # Zapisz wiadomość użytkownika do bazy danych
-    try:
-        save_message(conversation_id, user_id, user_message, is_from_user=True)
-        print("Wiadomość użytkownika zapisana w bazie")
-    except Exception as e:
-        print(f"Błąd przy zapisie wiadomości użytkownika: {e}")
+    save_message(conversation_id, user_id, user_message, is_from_user=True)
     
     # Wyślij informację, że bot pisze
     await update.message.chat.send_action(action=ChatAction.TYPING)
     
     # Pobierz historię konwersacji
-    try:
-        history = get_conversation_history(conversation_id, limit=MAX_CONTEXT_MESSAGES)
-        print(f"Pobrano historię konwersacji, liczba wiadomości: {len(history)}")
-    except Exception as e:
-        print(f"Błąd przy pobieraniu historii: {e}")
-        history = []
+    history = get_conversation_history(conversation_id, limit=MAX_CONTEXT_MESSAGES)
     
-    # Określ model do użycia - domyślny lub z trybu czatu
-    model_to_use = CHAT_MODES[current_mode].get("model", DEFAULT_MODEL)
-    
-    # Jeśli użytkownik wybrał konkretny model, użyj go
+    # Określ model do użycia - domyślny lub wybrany przez użytkownika
+    model_to_use = DEFAULT_MODEL
     if 'user_data' in context.chat_data and user_id in context.chat_data['user_data']:
         user_data = context.chat_data['user_data'][user_id]
         if 'current_model' in user_data:
             model_to_use = user_data['current_model']
-            # Aktualizuj koszt kredytów na podstawie modelu
-            credit_cost = CREDIT_COSTS["message"].get(model_to_use, CREDIT_COSTS["message"]["default"])
     
-    print(f"Używany model: {model_to_use}")
-    
-    # Przygotuj system prompt z wybranego trybu
-    system_prompt = CHAT_MODES[current_mode]["prompt"]
+    # Przygotuj system prompt - domyślny lub z wybranego trybu
+    system_prompt = CHAT_MODES["no_mode"]["prompt"]
+    if 'user_data' in context.chat_data and user_id in context.chat_data['user_data']:
+        user_data = context.chat_data['user_data'][user_id]
+        if 'current_mode' in user_data and user_data['current_mode'] in CHAT_MODES:
+            system_prompt = CHAT_MODES[user_data['current_mode']]["prompt"]
     
     # Przygotuj wiadomości dla API OpenAI
     messages = prepare_messages_from_history(history, user_message, system_prompt)
-    print(f"Przygotowano {len(messages)} wiadomości dla API")
     
     # Wyślij początkową pustą wiadomość, którą będziemy aktualizować
     response_message = await update.message.reply_text(get_text("generating_response", language))
@@ -531,143 +527,80 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Zainicjuj pełną odpowiedź
     full_response = ""
     buffer = ""
-    last_update = datetime.datetime.now().timestamp()
+    last_update = asyncio.get_event_loop().time()
     
-    # Spróbuj wygenerować odpowiedź
-    try:
-        print("Rozpoczynam generowanie odpowiedzi strumieniowej...")
-        # Generuj odpowiedź strumieniowo
-        async for chunk in chat_completion_stream(messages, model=model_to_use):
-            full_response += chunk
-            buffer += chunk
-            
-            # Aktualizuj wiadomość co 1 sekundę lub gdy bufor jest wystarczająco duży
-            current_time = datetime.datetime.now().timestamp()
-            if current_time - last_update >= 1.0 or len(buffer) > 100:
-                try:
-                    # Dodaj migający kursor na końcu wiadomości
-                    await response_message.edit_text(full_response + "▌", parse_mode=ParseMode.MARKDOWN)
-                    buffer = ""
-                    last_update = current_time
-                except Exception as e:
-                    # Jeśli wystąpi błąd (np. wiadomość nie została zmieniona), kontynuuj
-                    print(f"Błąd przy aktualizacji wiadomości: {e}")
+    # Generuj odpowiedź strumieniowo
+    async for chunk in chat_completion_stream(messages, model=model_to_use):
+        full_response += chunk
+        buffer += chunk
         
-        print("Zakończono generowanie odpowiedzi")
+        # Aktualizuj wiadomość co 1 sekundę lub gdy bufor jest wystarczająco duży
+        current_time = asyncio.get_event_loop().time()
+        if current_time - last_update >= 1.0 or len(buffer) > 100:
+            try:
+                # Dodaj migający kursor na końcu wiadomości
+                await response_message.edit_text(full_response + "▌", parse_mode=ParseMode.MARKDOWN)
+                buffer = ""
+                last_update = current_time
+            except Exception as e:
+                # Jeśli wystąpi błąd (np. wiadomość nie została zmieniona), kontynuuj
+                pass
+    
+    # Sprawdź, czy należy pokazać poradę (co 5-7 interakcji)
+    show_tip = False
+    if (context.chat_data['user_data'][user_id]['interaction_count'] % 6 == 0 and 
+        context.chat_data['user_data'][user_id]['show_tips']):
+        show_tip = True
         
-        # Aktualizuj wiadomość z pełną odpowiedzią bez kursora
+        # Wybierz losową poradę
+        import random
+        tip = random.choice(TIPS)
+        
+        # Dodaj poradę do odpowiedzi
+        full_response_with_tip = full_response + f"\n\n💡 *Porada:* {tip}"
+        
+        # Dodaj przycisk do wyłączenia porad
+        keyboard = [[InlineKeyboardButton("Nie pokazuj więcej porad", callback_data="disable_tips")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Aktualizuj wiadomość z poradą
+        try:
+            await response_message.edit_text(
+                full_response_with_tip, 
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            # Jeśli wystąpi błąd formatowania, wyślij bez formatowania
+            await response_message.edit_text(
+                full_response_with_tip,
+                reply_markup=reply_markup
+            )
+    else:
+        # Standardowa aktualizacja wiadomości bez porady
         try:
             await response_message.edit_text(full_response, parse_mode=ParseMode.MARKDOWN)
         except Exception as e:
             # Jeśli wystąpi błąd formatowania Markdown, wyślij bez formatowania
-            print(f"Błąd formatowania Markdown: {e}")
             await response_message.edit_text(full_response)
-        
-        # Zapisz odpowiedź do bazy danych
-        save_message(conversation_id, user_id, full_response, is_from_user=False, model_used=model_to_use)
-        
-        # Odejmij kredyty
-        deduct_user_credits(user_id, credit_cost, f"Wiadomość ({model_to_use})")
-        print(f"Odjęto {credit_cost} kredytów za wiadomość")
-    except Exception as e:
-        print(f"Wystąpił błąd podczas generowania odpowiedzi: {e}")
-        await response_message.edit_text(f"Wystąpił błąd podczas generowania odpowiedzi: {str(e)}")
-        return
     
-    # Sprawdź aktualny stan kredytów
-    credits = get_user_credits(user_id)
-    if credits < 5:
-        # Dodaj przycisk doładowania kredytów
-        keyboard = [[InlineKeyboardButton("🛒 " + get_text("buy_credits_btn", language, default="Kup kredyty"), callback_data="menu_credits_buy")]]
-        
-        await update.message.reply_text(
-
-f"*{get_text('low_credits_warning', language)}* {get_text('low_credits_message', language, credits=credits)}",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode=ParseMode.MARKDOWN
-        )
-
-async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Obsługa przesłanych dokumentów"""
-    user_id = update.effective_user.id
-    language = get_user_language(context, user_id)
+    # Zapisz odpowiedź do bazy danych - zawsze zapisuj bez porady
+    save_message(conversation_id, user_id, full_response, is_from_user=False, model_used=model_to_use)
     
-    # Sprawdź, czy użytkownik ma wystarczającą liczbę kredytów
-    credit_cost = CREDIT_COSTS["document"]
-    if not check_user_credits(user_id, credit_cost):
-        await update.message.reply_text(get_text("subscription_expired", language))
-        return
+    # Zwiększ licznik wykorzystanych wiadomości
+    increment_messages_used(user_id)
     
-    document = update.message.document
-    file_name = document.file_name
-    
-    # Sprawdź rozmiar pliku (limit 25MB)
-    if document.file_size > 25 * 1024 * 1024:
-        await update.message.reply_text(get_text("file_too_large", language))
-        return
-    
-    # Sprawdź, czy to jest prośba o tłumaczenie
-    caption = update.message.caption or ""
-    translate_mode = False
-    
-    if caption.lower().startswith("/translate") or caption.lower().startswith("przetłumacz"):
-        translate_mode = True
-    
-    # Sprawdź, czy plik to PDF i czy jest w trybie tłumaczenia
-    is_pdf = file_name.lower().endswith('.pdf')
-    
-    # Pobierz plik
-    if translate_mode and is_pdf:
-        from handlers.pdf_handler import handle_pdf_translation
-        await handle_pdf_translation(update, context)
-        return
-    elif translate_mode:
-        message = await update.message.reply_text(get_text("translating_document", language))
-    else:
-        message = await update.message.reply_text(get_text("analyzing_file", language))
-    
-    # Wyślij informację o aktywności bota
-    await update.message.chat.send_action(action=ChatAction.TYPING)
-    
-    file = await context.bot.get_file(document.file_id)
-    file_bytes = await file.download_as_bytearray()
-    
-    # Analizuj plik - w trybie tłumaczenia lub analizy w zależności od opcji
-    if translate_mode:
-        analysis = await analyze_document(file_bytes, file_name, mode="translate")
-        header = f"*{get_text('translated_text', language)}:*\n\n"
-    else:
-        analysis = await analyze_document(file_bytes, file_name)
-        header = f"*{get_text('file_analysis', language)}:* {file_name}\n\n"
-    
-    # Odejmij kredyty
-    description = "Tłumaczenie dokumentu" if translate_mode else "Analiza dokumentu"
-    deduct_user_credits(user_id, credit_cost, f"{description}: {file_name}")
-    
-    # Wyślij analizę do użytkownika
-    await message.edit_text(
-        f"{header}{analysis}",
-        parse_mode=ParseMode.MARKDOWN
-    )
-    
-    # Dodaj klawiaturę z dodatkowymi opcjami dla plików PDF
-    if is_pdf and not translate_mode:
-        keyboard = [[
-            InlineKeyboardButton(get_text("pdf_translate_button", language), callback_data=f"translate_pdf_{document.file_id}")
-        ]]
+    # Sprawdź, ile pozostało wiadomości
+    message_status = get_message_status(user_id)
+    if message_status["messages_left"] <= 5 and message_status["messages_left"] > 0:
+        # Dodaj przycisk do zakupu kredytów
+        keyboard = [[InlineKeyboardButton("🛒 " + get_text("buy_credits_btn", language), callback_data="menu_credits_buy")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        try:
-            await message.edit_reply_markup(reply_markup=reply_markup)
-        except Exception as e:
-            print(f"Błąd dodawania klawiatury: {e}")
-    
-    # Sprawdź aktualny stan kredytów
-    credits = get_user_credits(user_id)
-    if credits < 5:
         await update.message.reply_text(
-            f"*{get_text('low_credits_warning', language)}* {get_text('low_credits_message', language, credits=credits)}",
-            parse_mode=ParseMode.MARKDOWN
+            f"*{get_text('low_credits_warning', language)}* {get_text('low_credits_message', language, credits=message_status['messages_left'])}",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
         )
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -677,6 +610,40 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Sprawdź, czy użytkownik ma wystarczającą liczbę kredytów
     credit_cost = CREDIT_COSTS["photo"]
+    current_credits = get_user_credits(user_id)
+    
+    # Dodaj ostrzeżenie dla operacji kosztujących > 5 kredytów
+    if credit_cost > 5:
+        from utils.warning_utils import create_credit_warning
+        warning_msg, reply_markup, operation_id = create_credit_warning(credit_cost, current_credits, language)
+        
+        # Zapisz dane operacji w kontekście użytkownika
+        if 'pending_operations' not in context.user_data:
+            context.user_data['pending_operations'] = {}
+        
+        photo = update.message.photo[-1]
+        caption = update.message.caption or ""
+        translate_mode = False
+        
+        if caption.lower().startswith("/translate") or caption.lower().startswith("przetłumacz"):
+            translate_mode = True
+        
+        context.user_data['pending_operations'][operation_id] = {
+            'type': 'analyze_photo',
+            'photo_id': photo.file_id,
+            'translate_mode': translate_mode,
+            'cost': credit_cost
+        }
+        
+        # Wyślij ostrzeżenie
+        await update.message.reply_text(
+            warning_msg,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return
+    
+    # Reszta funkcji pozostaje bez zmian
     if not check_user_credits(user_id, credit_cost):
         await update.message.reply_text(get_text("subscription_expired", language))
         return
@@ -815,6 +782,37 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
     # Zawsze odpowiadaj na callback, aby usunąć oczekiwanie
     await query.answer()
     
+    # Dodaj ten kod w funkcji handle_callback_query
+if query.data == "disable_tips":
+    # Oznacz, że użytkownik wyłączył porady
+    if 'user_data' not in context.chat_data:
+        context.chat_data['user_data'] = {}
+    
+    if user_id not in context.chat_data['user_data']:
+        context.chat_data['user_data'][user_id] = {}
+    
+    context.chat_data['user_data'][user_id]['show_tips'] = False
+    
+    # Usuń przyciski z wiadomości
+    try:
+        if hasattr(query.message, 'caption'):
+            await query.edit_message_caption(
+                caption=query.message.caption,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await query.edit_message_text(
+                text=query.message.text,
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        # Jeśli wystąpi błąd, zignoruj go - prawdopodobnie wiadomość nie została zmieniona
+        pass
+    
+    # Potwierdź wyłączenie porad
+    await query.answer("Porady zostały wyłączone. Możesz je włączyć ponownie w ustawieniach.")
+    return
+    
     # Obsługa przycisków onboardingu
     if query.data.startswith("onboarding_"):
         await handle_onboarding_callback(update, context)
@@ -916,11 +914,11 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             del context.user_data['pending_operations'][operation_id]
             return
     
-elif query.data == "cancel_operation":
+    elif query.data == "cancel_operation":
     # Usuwamy wiadomość z ostrzeżeniem
-    await query.message.delete()
-    await query.answer(get_text("operation_canceled", language, default="Operacja anulowana"))
-    return
+        await query.message.delete()
+        await query.answer(get_text("operation_canceled", language, default="Operacja anulowana"))
+    r   eturn
 
     # Dodaj to w sekcji obsługi callbacków w funkcji handle_callback_query
     if query.data == "menu_home":

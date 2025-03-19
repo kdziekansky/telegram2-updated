@@ -70,19 +70,33 @@ async def generate_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Odejmij kredyty
     deduct_user_credits(user_id, credit_cost, "Generowanie obrazu")
     
-    if image_url:
+if image_url:
+    try:
         # Usuń wiadomość o ładowaniu
         await message.delete()
         
         # Wyślij obraz
         await update.message.reply_photo(
             photo=image_url,
-            caption=f"*{get_text('generated_image', language, default='Wygenerowany obraz:')}*\n{prompt}\n{get_text('cost', language, default='Koszt')}: {credit_cost} {get_text('credits', language, default='kredytów')}",
+            caption=f"*{get_text('generated_image', language)}*\n{prompt}\n{get_text('cost', language)}: {credit_cost} {get_text('credits', language)}",
             parse_mode=ParseMode.MARKDOWN
         )
-    else:
+    except Exception as e:
+        print(f"Błąd przy wysyłaniu obrazu: {e}")
+        await update.message.reply_text(
+            f"⚠️ {get_text('image_generation_error', language)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+else:
+    try:
         # Aktualizuj wiadomość o błędzie
-        await message.edit_text(get_text("image_generation_error", language, default="Przepraszam, wystąpił błąd podczas generowania obrazu. Spróbuj ponownie z innym opisem."))
+        await message.edit_text(get_text("image_generation_error", language))
+    except Exception as e:
+        print(f"Błąd przy aktualizacji wiadomości o błędzie: {e}")
+        await update.message.reply_text(
+            f"⚠️ {get_text('image_generation_error', language)}",
+            parse_mode=ParseMode.MARKDOWN
+        )
     
     # Sprawdź aktualny stan kredytów
     credits = get_user_credits(user_id)
